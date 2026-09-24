@@ -8,7 +8,6 @@ import (
 
 	"github.com/medunes/go-kata/01-context-cancellation-concurrency/01-concurrent-aggregator/order"
 	"github.com/medunes/go-kata/01-context-cancellation-concurrency/01-concurrent-aggregator/profile"
-
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,8 +36,9 @@ func NewUserAggregator(os order.Service, ps profile.Service, opts ...Option) *Us
 	ua := &UserAggregator{
 		orderService:   os,
 		profileService: ps,
-		logger:         slog.Default(), // avoid nil panics, default writes to stderr
+		logger:         slog.Default(),
 	}
+
 	for _, opt := range opts {
 		opt(ua)
 	}
@@ -59,13 +59,17 @@ func (ua *UserAggregator) Aggregate(ctx context.Context, id int) ([]*AggregatedP
 		au       []*AggregatedProfile
 		g        *errgroup.Group
 	)
+
 	if ua.timeout > 0 {
 		localCtx, cancel = context.WithTimeout(ctx, ua.timeout)
 	} else {
 		localCtx, cancel = context.WithCancel(ctx)
 	}
+
 	defer cancel()
+
 	ua.logger.Info("starting aggregation", "user_id", id)
+
 	g, localCtx = errgroup.WithContext(localCtx)
 	g.Go(func() error {
 		var err error
@@ -88,6 +92,7 @@ func (ua *UserAggregator) Aggregate(ctx context.Context, id int) ([]*AggregatedP
 	})
 
 	err := g.Wait()
+
 	if err != nil {
 		ua.logger.Warn("aggregator exited with error", "user_id", id, "err", err)
 		return nil, err
@@ -99,4 +104,5 @@ func (ua *UserAggregator) Aggregate(ctx context.Context, id int) ([]*AggregatedP
 	}
 	ua.logger.Info("aggregation complete successfully", "user_id", id, "count", len(au))
 	return au, nil
+
 }
